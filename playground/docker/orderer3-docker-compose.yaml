@@ -1,0 +1,42 @@
+version: '2'
+
+volumes:
+  orderer3.cathaybc.com:
+
+networks:
+  test:
+
+services:
+  orderer3.cathaybc.com:
+    container_name: orderer3.cathaybc.com
+    image: hyperledger/fabric-orderer:2.2.1
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050 # 定義 order 要去 listen 的 port
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block # 定義產生出來的 genesis block 的位置
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP # 填好創世區塊 configtx.yaml 定義好的唯一識別碼 MSP ID
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp # 填上 order 節點末端憑證的 msp 所在路徑
+      # enabled TLS
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_KAFKA_TOPIC_REPLICATIONFACTOR=1
+      - ORDERER_KAFKA_VERBOSE=false
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: orderer
+    volumes: # 定義好 docker-compose mount 的位置對應 host:docker container
+        - ../system-genesis-block/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
+        - ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer3.cathaybc.com/msp:/var/hyperledger/orderer/msp
+        - ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer3.cathaybc.com/tls/:/var/hyperledger/orderer/tls
+        - orderer3.cathaybc.com:/var/hyperledger/production/orderer
+    ports:
+      # HOST_PORT:CONTAINER_PORT，若啟動多個節點只須改 HOST_PORT 即可, 否則改到 CONTAINER_PORT 的話, 那麼創世區塊 configtx.yaml 的 port 也要跟著改了, 麻煩
+      - 7250:7050
+    networks:
+      - test

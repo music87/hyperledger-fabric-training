@@ -43,6 +43,8 @@ Organizations: # 定義有哪些組織, eg. order, peer, 及其權限, 至於每
 
         OrdererEndpoints: # 有幾台 order 節點就要在這邊寫明
             - orderer1.cathaybc.com:7050
+            - orderer2.cathaybc.com:7050
+            - orderer3.cathaybc.com:7050
 
     - &Org1
         # DefaultOrg defines the organization which is used in the sampleconfig
@@ -77,6 +79,42 @@ Organizations: # 定義有哪些組織, eg. order, peer, 及其權限, 至於每
             # for cross org gossip communication.  Note, this value is only
             # encoded in the genesis block in the Application section context
             - Host: peer1.org1.cathaybc.com
+              Port: 7051
+    
+
+    - &Org2
+        # DefaultOrg defines the organization which is used in the sampleconfig
+        # of the fabric.git development environment
+        Name: Org2MSP
+
+        # ID to load the MSP definition as
+        ID: Org2MSP # 此 ID 必須在此區塊鏈中是唯一的
+
+        MSPDir: ../crypto-config/peerOrganizations/org2.cathaybc.com/msp # 放 peer 組織的憑證
+
+        # Policies defines the set of policies at this level of the config tree
+        # For organization policies, their canonical path is usually
+        #   /Channel/<Application|Orderer>/<OrgName>/<PolicyName>
+        Policies:
+            Readers:
+                Type: Signature
+                Rule: "OR('Org2MSP.admin', 'Org2MSP.peer', 'Org2MSP.client')"
+            Writers:
+                Type: Signature
+                Rule: "OR('Org2MSP.admin', 'Org2MSP.client')"
+            Admins:
+                Type: Signature
+                Rule: "OR('Org2MSP.admin')"
+            Endorsement: # endorsement 的機制只有 peer 才有, order 沒有
+                Type: Signature
+                Rule: "OR('Org2MSP.peer')" #網路上教學會將這邊改成 Org2MSP.admin, 非常不建議這樣做
+
+        # leave this flag set to true.
+        AnchorPeers: # 影響到 discovery 功能, 即確認這個 channel 上有幾台 peer 節點還活著 i.e. AnchorPeers 會紀錄現在組織上節點的位置, 有了該位置才能讓其他節點知道該節點是否還活著
+            # AnchorPeers defines the location of peers which can be used
+            # for cross org gossip communication.  Note, this value is only
+            # encoded in the genesis block in the Application section context
+            - Host: peer1.org2.cathaybc.com
               Port: 7051
 
 ################################################################################
@@ -182,14 +220,22 @@ Application: &ApplicationDefaults # 與 application channel 相關的 policy 的
 Orderer: &OrdererDefaults
 
     # Orderer Type: The orderer implementation to start, ex: solo or etcdraft
-    OrdererType: solo # 共識演算法
+    OrdererType: etcdraft # 共識演算法
 
     EtcdRaft:
-        Consenters: # 有幾個 order 節點就填幾個
+        Consenters: # 有幾個 order 節點就填幾個, port number 要一樣, accord. to https://stackoverflow.com/questions/67884710/orderer-service-raft-consensus-leader-issue
         - Host: orderer1.cathaybc.com
           Port: 7050
           ClientTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/server.crt
           ServerTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/server.crt
+        - Host: orderer2.cathaybc.com
+          Port: 7050
+          ClientTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer2.cathaybc.com/tls/server.crt
+          ServerTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer2.cathaybc.com/tls/server.crt
+        - Host: orderer3.cathaybc.com
+          Port: 7050
+          ClientTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer3.cathaybc.com/tls/server.crt
+          ServerTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer3.cathaybc.com/tls/server.crt
 
     # Batch Timeout: The amount of time to wait before creating a batch
     BatchTimeout: 2s # transaction 至少要經過多久才能被打包成 block 上鏈來完成交易
@@ -286,6 +332,7 @@ Profiles: # 創始區塊用, 透過指標的方式讓整體架構好看一點
             SampleConsortium:
                 Organizations:
                     - *Org1 # 定義有哪些 peer 節點才有權利 "create" application channel; 注意, 沒有 create channel 的權利不代表沒有加入 channel 的權利
+                    - *Org2
     OrgsChannel:
         Consortium: SampleConsortium
         <<: *ChannelDefaults
@@ -293,5 +340,6 @@ Profiles: # 創始區塊用, 透過指標的方式讓整體架構好看一點
             <<: *ApplicationDefaults
             Organizations:
                 - *Org1 # 定義哪些 peer 節點有 "加入" application channel 的權利
+                - *Org2
             Capabilities:
                 <<: *ApplicationCapabilities

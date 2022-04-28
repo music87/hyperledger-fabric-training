@@ -1,0 +1,24 @@
+# Copyright IBM Corp. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+
+# ---------------------------------------------------------------------------
+# "PeerOrgs" - Definition of organizations managing peer nodes
+# ---------------------------------------------------------------------------
+# 此檔案負責產生 peer 的憑證
+PeerOrgs:
+  # ---------------------------------------------------------------------------
+  # Org2
+  # ---------------------------------------------------------------------------
+  - Name: Org2
+    Domain: org2.cathaybc.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1 # 決定 peer 的數量
+      SANS:
+        - localhost
+      Start: 1 # 決定 peer 憑證的編號要從多少開始
+    Users: # Users 即 MSP 識別的身份裡屬於 client 的角色 aka. Org1MSP.client in configtx.yaml
+      Count: 1 # 決定 user 的數量, 不過 admin 永遠只會有一個

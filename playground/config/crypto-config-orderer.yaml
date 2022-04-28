@@ -15,7 +15,7 @@ OrdererOrgs:
     Domain: cathaybc.com # 設定 domain 的名字, 會與產生出來的 order 憑證的 issuer's 與 subject's domain 有關
     EnableNodeOUs: true # OU aka. Organization Unit, 這個打開就會產生 crypto-config/msp_path/config.yaml, 裡面定義了每種憑證代表的角色 admin/peer/client/orderer, 如此一來在創始區塊文檔 configtx.yaml 定義的 Org1MSP.{admin/peer/client/orderer} 代表什麼樣的角色才有辦法被辨別出來
     Template:
-      Count: 1 # 決定要產生幾個 order 的憑證
+      Count: 3 # 決定要產生幾個 order 的憑證
       SANS:
         - localhost
       Start: 1 # 決定 order 憑證的編號要從多少開始

@@ -22,27 +22,34 @@ cryptogen generate --config=./config/crypto-config-orderer.yaml --output=./crypt
 
 #產生peer憑證
 cryptogen generate --config=./config/crypto-config-org1.yaml --output=./crypto-config
+cryptogen generate --config=./config/crypto-config-org2.yaml --output=./crypto-config
 
 #產生創世區塊, 此時還沒有 order 能幫忙產生 block, 需指定 -outputBlock 來指定 system channel 的創世區塊
 configtxgen -configPath ./config -profile OrderersGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
 
 # 啟動 order 的 docker 並查看 continaer 裡的活動
 docker-compose -f ./docker/orderer1-docker-compose.yaml up -d
-docker logs order1.cathaybc.com -f
+#docker logs order1.cathaybc.com -f
+docker-compose -f ./docker/orderer2-docker-compose.yaml up -d
+#docker logs order1.cathaybc.com -f
+docker-compose -f ./docker/orderer3-docker-compose.yaml up -d
+#docker logs order1.cathaybc.com -f
 
 #產生create application channel文件使 peer 與 order 能互相溝通, 此時已有 order 能幫忙產生 application channel 的創世區塊, 只需透過 -outputCreateChannelTx 指定要產生的交易文件位置, 而 -channelID 則接要產生的 channel 的名稱
 configtxgen -configPath ./config -profile OrgsChannel -outputCreateChannelTx ./channel-artifacts/cathay.tx -channelID cathay
 
-# 啟動 peer 的 docker 並查看 continaer 裡的活動
+# 啟動 peer 的 docker 並查看 continaer 裡的活動, 記得要先等 docker 初始化跑完 i.e. 等 go 下載完
 docker-compose -f ./docker/peer1-org1-docker-compose.yaml up -d
-docker logs peer1.org1.cathaybc.com -f
+#docker logs peer1.org1.cathaybc.com -f
+docker-compose -f ./docker/peer1-org2-docker-compose.yaml up -d
+#docker logs peer1.org2.cathaybc.com -f
 
 #產生update anchor peer文件
 configtxgen -configPath ./config -profile OrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org1Anchors.tx -channelID cathay -asOrg Org1MSP
+configtxgen -configPath ./config -profile OrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org2Anchors.tx -channelID cathay -asOrg Org2MSP
 
 #進入docker container
 docker exec -it peer1.org1.cathaybc.com sh
-
 
 #################################### 以下為 container 內的指令 ####################################
 
@@ -67,29 +74,83 @@ peer lifecycle chaincode install test-chaincode.tar.gz
 #查看安裝
 peer lifecycle chaincode queryinstalled
 
-#批准
+#批准, 記得把 [貼上 Package ID] 那邊換掉
 peer lifecycle chaincode approveformyorg -o orderer1.cathaybc.com:7050 --channelID cathay --name test-chaincode --version 1 --sequence 1 --init-required --package-id [貼上 Package ID] --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
 
 #查看批准狀態
 peer lifecycle chaincode checkcommitreadiness --channelID cathay --name test-chaincode --version 1 --sequence 1 --output json --init-required
 
-#提交
+#提交, 等足夠數量的 peer 都 approve 後就能提交成功了
 #若需要兩節點背書，須加上 --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
-peer lifecycle chaincode commit -o orderer1.cathaybc.com:7050 --channelID cathay --name test-chaincode --version 1 --sequence 1 --init-required --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
+peer lifecycle chaincode commit -o orderer1.cathaybc.com:7050 --channelID cathay --name test-chaincode --version 1 --sequence 1 --init-required --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
 
 #查看提交
 peer lifecycle chaincode querycommitted --channelID cathay --name test-chaincode
 
 #初始化
 #若需要兩節點背書，須加上 --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
-peer chaincode invoke -o orderer1.cathaybc.com:7050 -C cathay -n test-chaincode --isInit -c '{"function":"Init","Args":[]}' --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
+peer chaincode invoke -o orderer1.cathaybc.com:7050 -C cathay -n test-chaincode --isInit -c '{"function":"Init","Args":[]}' --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
 
 #Query example
 peer chaincode query -C cathay -n test-chaincode -c '{"function":"QueryFunction1","Args":[]}'
 
 #Invoke example
 #若需要兩節點背書，須加上 --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
-peer chaincode invoke -o orderer1.cathaybc.com:7050 -C cathay -n test-chaincode -c '{"function":"InvokeFunction1","Args":[]}' --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
+peer chaincode invoke -o orderer1.cathaybc.com:7050 -C cathay -n test-chaincode -c '{"function":"InvokeFunction1","Args":[]}' --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
+
+#################################### 以上為 container 內的指令 ####################################
+
+#進入docker container
+docker exec -it peer1.org2.cathaybc.com sh
+
+#################################### 以下為 container 內的指令 ####################################
+
+#設定使用admin憑證, 為了 create channel 需要 admin 的憑證
+export CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto-config/peerOrganizations/org2.cathaybc.com/users/Admin@org2.cathaybc.com/msp/
+
+#不需要建立 application channel, 因為 peer1 已經建過
+#peer channel create -o orderer2.cathaybc.com:7050 -c cathay -f ./channel-artifacts/cathay.tx --outputBlock ./channel-artifacts/cathay.block --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer2.cathaybc.com/tls/ca.crt
+
+#加入channel
+peer channel join -b ./channel-artifacts/cathay.block
+
+#更新anchor peer
+peer channel update -o orderer1.cathaybc.com:7050 -c cathay -f ./channel-artifacts/org2Anchors.tx --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
+
+#打包 chaincode
+peer lifecycle chaincode package test-chaincode.tar.gz --path /chaincode/test-chaincode --lang golang --label test-chaincode_1
+
+#安裝
+peer lifecycle chaincode install test-chaincode.tar.gz
+
+#查看安裝
+peer lifecycle chaincode queryinstalled
+
+#批准, 記得把 [貼上 Package ID] 那邊換掉
+peer lifecycle chaincode approveformyorg -o orderer1.cathaybc.com:7050 --channelID cathay --name test-chaincode --version 1 --sequence 1 --init-required --package-id [貼上 Package ID] --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
+
+#查看批准狀態
+peer lifecycle chaincode checkcommitreadiness --channelID cathay --name test-chaincode --version 1 --sequence 1 --output json --init-required
+
+#提交, 等足夠數量的 peer 都 approve 後就能提交成功了, 不過因為 peer1 提交過了, 因此 peer2 不需要再提交一次
+#若需要兩節點背書，須加上 --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
+#peer lifecycle chaincode commit -o orderer1.cathaybc.com:7050 --channelID cathay --name test-chaincode --version 1 --sequence 1 --init-required --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
+
+#查看提交
+peer lifecycle chaincode querycommitted --channelID cathay --name test-chaincode
+
+#初始化, 不過因為 peer1 已經初始化過了, 因此 peer2 不需要再初始化一次
+#若需要兩節點背書，須加上 --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
+#peer chaincode invoke -o orderer1.cathaybc.com:7050 -C cathay -n test-chaincode --isInit -c '{"function":"Init","Args":[]}' --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
+
+#Query example
+peer chaincode query -C cathay -n test-chaincode -c '{"function":"QueryFunction1","Args":[]}'
+
+#Invoke example
+#若需要兩節點背書，須加上 --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
+peer chaincode invoke -o orderer1.cathaybc.com:7050 -C cathay -n test-chaincode -c '{"function":"InvokeFunction1","Args":[]}' --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
+
+#################################### 以上為 container 內的指令 ####################################
 
 #################################### 以下為其他指令 ####################################
 
