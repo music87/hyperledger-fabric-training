@@ -40,7 +40,7 @@ docker logs peer1.org1.cathaybc.com -f
 #產生update anchor peer文件
 configtxgen -configPath ./config -profile OrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org1Anchors.tx -channelID cathay -asOrg Org1MSP
 
-#進入docker container
+#進入docker container, 記得要先等 docker 初始化跑完 i.e. 等 go 下載完
 docker exec -it peer1.org1.cathaybc.com sh
 
 
@@ -67,13 +67,13 @@ peer lifecycle chaincode install test-chaincode.tar.gz
 #查看安裝
 peer lifecycle chaincode queryinstalled
 
-#批准
+#批准, 記得把 [貼上 Package ID] 那邊換掉
 peer lifecycle chaincode approveformyorg -o orderer1.cathaybc.com:7050 --channelID cathay --name test-chaincode --version 1 --sequence 1 --init-required --package-id [貼上 Package ID] --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
 
 #查看批准狀態
 peer lifecycle chaincode checkcommitreadiness --channelID cathay --name test-chaincode --version 1 --sequence 1 --output json --init-required
 
-#提交
+#提交, 等足夠數量的 peer 都 approve 後就能提交成功了
 #若需要兩節點背書，須加上 --peerAddresses peer1.org1.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org1.cathaybc.com/peers/peer1.org1.cathaybc.com/tls/ca.crt --peerAddresses peer1.org2.cathaybc.com:7051 --tlsRootCertFiles ./crypto-config/peerOrganizations/org2.cathaybc.com/peers/peer1.org2.cathaybc.com/tls/ca.crt
 peer lifecycle chaincode commit -o orderer1.cathaybc.com:7050 --channelID cathay --name test-chaincode --version 1 --sequence 1 --init-required --waitForEvent --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
 
