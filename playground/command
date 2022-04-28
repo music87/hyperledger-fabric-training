@@ -1,5 +1,6 @@
 #設定PATH路徑，為什麼需要設定?請參考 https://iter01.com/558435.html
 #如果是Macbook M1架構請改執行 export PATH=${PWD}/../bin/linux-aarch64:$PATH
+cd playground
 export PATH=${PWD}/../bin/linux-amd64:$PATH
 
 #移除所有正在執行的container，建議在建置新的區塊鏈網路前執行一次
@@ -22,11 +23,19 @@ cryptogen generate --config=./config/crypto-config-orderer.yaml --output=./crypt
 #產生peer憑證
 cryptogen generate --config=./config/crypto-config-org1.yaml --output=./crypto-config
 
-#產生創世區塊
+#產生創世區塊, 此時還沒有 order 能幫忙產生 block, 需指定 -outputBlock 來指定 system channel 的創世區塊
 configtxgen -configPath ./config -profile OrderersGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
 
-#產生create application channel文件
+# 啟動 order 的 docker 並查看 continaer 裡的活動
+docker-compose -f ./docker/orderer1-docker-compose.yaml up -d
+docker logs order1.cathaybc.com -f
+
+#產生create application channel文件使 peer 與 order 能互相溝通, 此時已有 order 能幫忙產生 application channel 的創世區塊, 只需透過 -outputCreateChannelTx 指定要產生的交易文件位置, 而 -channelID 則接要產生的 channel 的名稱
 configtxgen -configPath ./config -profile OrgsChannel -outputCreateChannelTx ./channel-artifacts/cathay.tx -channelID cathay
+
+# 啟動 peer 的 docker 並查看 continaer 裡的活動
+docker-compose -f ./docker/peer1-org1-docker-compose.yaml up -d
+docker logs peer1.org1.cathaybc.com -f
 
 #產生update anchor peer文件
 configtxgen -configPath ./config -profile OrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org1Anchors.tx -channelID cathay -asOrg Org1MSP
@@ -37,10 +46,10 @@ docker exec -it peer1.org1.cathaybc.com sh
 
 #################################### 以下為 container 內的指令 ####################################
 
-#設定使用admin憑證
+#設定使用admin憑證, 為了 create channel 需要 admin 的憑證
 export CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto-config/peerOrganizations/org1.cathaybc.com/users/Admin@org1.cathaybc.com/msp/
 
-#建立channel
+#建立channel, -o 指定了這個 peer 要跟哪台 order 做互動, -c 接在 peer container 外透過 configtxgen -channelID 產生的 channel 名稱, -f 接透過 configtxgen -outputCreateChannelTx 產生出來的交易文件位置(這樣才能在之後 create application channel 時輕鬆的代進事先於 configtx.yaml 設定好的那些參數), --outputBlock 接 order 產生的 application channel 的創世區塊 cathay.block, 而因為需要跟 order 做傳輸加密, 所以 --tls 要打開並要附上溝通的 order 節點的 tls 憑證位置
 peer channel create -o orderer1.cathaybc.com:7050 -c cathay -f ./channel-artifacts/cathay.tx --outputBlock ./channel-artifacts/cathay.block --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
 
 #加入channel
@@ -49,7 +58,7 @@ peer channel join -b ./channel-artifacts/cathay.block
 #更新anchor peer
 peer channel update -o orderer1.cathaybc.com:7050 -c cathay -f ./channel-artifacts/org1Anchors.tx --tls --cafile ./crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/ca.crt
 
-#打包
+#打包 chaincode
 peer lifecycle chaincode package test-chaincode.tar.gz --path /chaincode/test-chaincode --lang golang --label test-chaincode_1
 
 #安裝

@@ -12,7 +12,7 @@
 #   be referenced later in the configuration.
 #
 ################################################################################
-Organizations:
+Organizations: # 定義有哪些組織, eg. order, peer, 及其權限, 至於每種組織各自的數量則不在此檔案中定義, 除了 OrdererEndpoints 與 order 共識決策(Solo, Raft, etc.)的 Consenters 那邊會寫明是第幾台 order 做哪些事情
 
     # SampleOrg defines an MSP using the sampleconfig.  It should never be used
     # in production but may be used as a template for other definitions
@@ -22,26 +22,26 @@ Organizations:
         Name: OrdererOrg
 
         # ID to load the MSP definition as
-        ID: OrdererMSP
+        ID: OrdererMSP # 此 ID 必須在此區塊鏈中是唯一的
 
         # MSPDir is the filesystem path which contains the MSP configuration
-        MSPDir: ../crypto-config/ordererOrganizations/cathaybc.com/msp
+        MSPDir: ../crypto-config/ordererOrganizations/cathaybc.com/msp # 放 order 組織的憑證在創世區塊的定義裡, 往後就會查看每個 order/peer 所持有的憑證是否是透過該組織的 RCA 所發放, 來確認可否將之加進 channel 裡面
 
         # Policies defines the set of policies at this level of the config tree
         # For organization policies, their canonical path is usually
         #   /Channel/<Application|Orderer>/<OrgName>/<PolicyName>
         Policies:
-            Readers:
+            Readers: # 這份創始區塊文件在 fabric channel 裡面也會不斷被更新, 因此 order 有權利將此文件拉出來看
+                Type: Signature
+                Rule: "OR('OrdererMSP.member')" # member 包含了所有角色 admin, peer, orderer, client
+            Writers: # 修改自己的文件的權利
                 Type: Signature
                 Rule: "OR('OrdererMSP.member')"
-            Writers:
-                Type: Signature
-                Rule: "OR('OrdererMSP.member')"
-            Admins:
+            Admins: # 修改別人的文件的權利
                 Type: Signature
                 Rule: "OR('OrdererMSP.admin')"
 
-        OrdererEndpoints:
+        OrdererEndpoints: # 有幾台 order 節點就要在這邊寫明
             - orderer1.cathaybc.com:7050
 
     - &Org1
@@ -50,9 +50,9 @@ Organizations:
         Name: Org1MSP
 
         # ID to load the MSP definition as
-        ID: Org1MSP
+        ID: Org1MSP # 此 ID 必須在此區塊鏈中是唯一的
 
-        MSPDir: ../crypto-config/peerOrganizations/org1.cathaybc.com/msp
+        MSPDir: ../crypto-config/peerOrganizations/org1.cathaybc.com/msp # 放 peer 組織的憑證
 
         # Policies defines the set of policies at this level of the config tree
         # For organization policies, their canonical path is usually
@@ -67,12 +67,12 @@ Organizations:
             Admins:
                 Type: Signature
                 Rule: "OR('Org1MSP.admin')"
-            Endorsement:
+            Endorsement: # endorsement 的機制只有 peer 才有, order 沒有
                 Type: Signature
-                Rule: "OR('Org1MSP.peer')"
+                Rule: "OR('Org1MSP.peer')" #網路上教學會將這邊改成 Org1MSP.admin, 非常不建議這樣做
 
         # leave this flag set to true.
-        AnchorPeers:
+        AnchorPeers: # 影響到 discovery 功能, 即確認這個 channel 上有幾台 peer 節點還活著 i.e. AnchorPeers 會紀錄現在組織上節點的位置, 有了該位置才能讓其他節點知道該節點是否還活著
             # AnchorPeers defines the location of peers which can be used
             # for cross org gossip communication.  Note, this value is only
             # encoded in the genesis block in the Application section context
@@ -98,7 +98,7 @@ Organizations:
 #   then the v1.0.x peer will deliberately crash.
 #
 ################################################################################
-Capabilities:
+Capabilities: # 設定相容的 fabric 區塊鏈版本有哪些
     # Channel capabilities apply to both the orderers and the peers and must be
     # supported by both.
     # Set the value of the capability to true to require it.
@@ -143,7 +143,7 @@ Capabilities:
 #   genesis block for application related parameters
 #
 ################################################################################
-Application: &ApplicationDefaults
+Application: &ApplicationDefaults # 與 application channel 相關的 policy 的設定
 
     # Organizations is the list of orgs which are defined as participants on
     # the application side of the network
@@ -159,13 +159,13 @@ Application: &ApplicationDefaults
         Writers:
             Type: ImplicitMeta
             Rule: "ANY Writers"
-        Admins:
+        Admins: # 新增組織與刪除組織 eg. Org1 的權利
             Type: ImplicitMeta
             Rule: "MAJORITY Admins"
-        LifecycleEndorsement:
+        LifecycleEndorsement: # 牽涉到 chaincode 要如何才能夠被執行的 endorsement policy
             Type: ImplicitMeta
-            Rule: "MAJORITY Endorsement"
-        Endorsement:
+            Rule: "MAJORITY Endorsement" # 條件是過半的"組織 Org1"的Endorsement policy都要通過完成簽名, 才能夠 commit chaincode 到鏈上
+        Endorsement: # 修改此內容需要大家的背書
             Type: ImplicitMeta
             Rule: "MAJORITY Endorsement"
 
@@ -182,17 +182,17 @@ Application: &ApplicationDefaults
 Orderer: &OrdererDefaults
 
     # Orderer Type: The orderer implementation to start, ex: solo or etcdraft
-    OrdererType: solo
+    OrdererType: solo # 共識演算法
 
     EtcdRaft:
-        Consenters:
+        Consenters: # 有幾個 order 節點就填幾個
         - Host: orderer1.cathaybc.com
           Port: 7050
           ClientTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/server.crt
           ServerTLSCert: ../crypto-config/ordererOrganizations/cathaybc.com/orderers/orderer1.cathaybc.com/tls/server.crt
 
     # Batch Timeout: The amount of time to wait before creating a batch
-    BatchTimeout: 2s
+    BatchTimeout: 2s # transaction 至少要經過多久才能被打包成 block 上鏈來完成交易
 
     # Batch Size: Controls the number of messages batched into a block
     BatchSize:
@@ -240,7 +240,7 @@ Orderer: &OrdererDefaults
 #   genesis block for channel related parameters.
 #
 ################################################################################
-Channel: &ChannelDefaults
+Channel: &ChannelDefaults # 比 application channel 上層的 system channel policy
     # Policies defines the set of policies at this level of the config tree
     # For Channel policies, their canonical path is
     #   /Channel/<PolicyName>
@@ -272,7 +272,7 @@ Channel: &ChannelDefaults
 #   as parameters to the configtxgen tool
 #
 ################################################################################
-Profiles:
+Profiles: # 創始區塊用, 透過指標的方式讓整體架構好看一點
 
     OrderersGenesis:
         <<: *ChannelDefaults
@@ -282,16 +282,16 @@ Profiles:
                 - *OrdererOrg
             Capabilities:
                 <<: *OrdererCapabilities
-        Consortiums:
+        Consortiums: # 雖然這邊是在講 OrderesGenesis, 但至少要將一個 peer 節點加進這個 system channel 裡, 如此才能做 create application channel 的動作, 這個區塊鏈才有辦法正常運作 (不太可能將 chaincode 安裝在 sys channel 上)
             SampleConsortium:
                 Organizations:
-                    - *Org1
+                    - *Org1 # 定義有哪些 peer 節點才有權利 "create" application channel; 注意, 沒有 create channel 的權利不代表沒有加入 channel 的權利
     OrgsChannel:
         Consortium: SampleConsortium
         <<: *ChannelDefaults
         Application:
             <<: *ApplicationDefaults
             Organizations:
-                - *Org1
+                - *Org1 # 定義哪些 peer 節點有 "加入" application channel 的權利
             Capabilities:
                 <<: *ApplicationCapabilities
