@@ -253,3 +253,19 @@ func (s *SmartContract) GetBankByID(ctx contractapi.TransactionContextInterface,
 
 	return &bank, nil
 }
+
+func (s *SmartContract) CreateBank(ctx contractapi.TransactionContextInterface, bankId string, name string) error{
+
+	bank := Bank{
+		ID: bankId,
+		Name: name,
+		TransactionCount: 0,
+	}
+
+	bankJson, err:= json.Marshal(bank)
+	if err != nil{
+		return err
+	}
+
+	return ctx.GetStub().PutState(BankPrefix+bankId, bankJson)
+}

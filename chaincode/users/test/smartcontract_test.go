@@ -45,6 +45,12 @@ var transaction2 smartcontract.Transaction = smartcontract.Transaction{
 	BankId: "04231910",
 }
 
+var bank1 smartcontract.Bank = smartcontract.Bank{
+	ID: "01234567",
+	Name: "TestBank",
+	TransactionCount: 0,
+}
+
 func TestMain(m *testing.M) {
 	setup()
 	code := m.Run()
@@ -422,4 +428,32 @@ func Test_BankTransactionCount(t *testing.T) {
 	fmt.Println(bank)
 	assert.Equal(t, bank.TransactionCount, 2)
 
+}
+
+// func MockCreateBank(bankId string) (*smartcontract.Bank, error){
+func MockCreateBank(bankId string, bankName string) (error){
+
+	res := Stub.MockInvoke("uuid",
+		[][]byte{
+			[]byte("CreateBank"),
+			[]byte(bankId),
+			[]byte(bankName),
+		})
+
+	if res.Status != shim.OK {
+		fmt.Println("CreateBank failed", string(res.Message))
+		return errors.New("CreateBank error")
+	}
+
+	return nil
+}
+
+func Test_CreateBank(t *testing.T){
+	fmt.Println("Test_CreateBank-----------------")
+	NewStub()
+
+	err := MockCreateBank(bank1.ID, bank1.Name)
+	if err != nil {
+		t.FailNow()
+	}
 }
